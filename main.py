@@ -53,9 +53,10 @@ async def on_ready():
 @bot.tree.command(name="startsession", description="Start a new ER:LC session")
 @app_commands.describe(
     game_type="Example: prison, police, firefighter, medic, casual",
-    player_count="Max players in the session (default: 6)"
+    player_count="Max players in the session (default: 6)",
+    image="Optional: JPG image to display in the session embed"
 )
-async def start_session(interaction: discord.Interaction, game_type: str, player_count: int = 6):
+async def start_session(interaction: discord.Interaction, game_type: str, player_count: int = 6, image: discord.Attachment = None):
     """Start a new gaming session - Session Manager only"""
     
     # Check permissions
@@ -67,6 +68,17 @@ async def start_session(interaction: discord.Interaction, game_type: str, player
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
         return
+    
+    # Validate image if provided
+    if image:
+        if not image.content_type or not image.content_type.startswith("image/"):
+            embed = discord.Embed(
+                title="❌ Invalid Image",
+                description="Please attach a valid image file (JPG, PNG, etc.)",
+                color=discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
     
     try:
         session = session_manager.create_session(
@@ -86,6 +98,10 @@ async def start_session(interaction: discord.Interaction, game_type: str, player
         embed.add_field(name="Max Players", value=f"{session['current_players']}/{session['max_players']}", inline=True)
         embed.add_field(name="Status", value="🟢 Active", inline=True)
         embed.set_footer(text="Use /joinsession to join!")
+        
+        # Add image to embed if provided
+        if image:
+            embed.set_image(url=image.url)
         
         # Send to user
         await interaction.response.send_message(embed=embed)
@@ -192,7 +208,7 @@ async def list_sessions(interaction: discord.Interaction):
 
         embed.add_field(
             name=f"**ID:** `{session['id']}`",
-            value=f"**Type:** {session['game_type'].capitalize()}\n**Host:** <@{session['host_id']}>\n**Players:** {session['current_players']}/{session['max_players']}\n**Status:** {session['status']}\n**Members:**\n{player_list}",
+            value=f"**Type:** {session['game_type'].capitalize()}\n**Host:** <@{session['host_id']}>\n**Players:** {session['current_players']}/{session['max_players']}\n**Status:** {session['status']}",
             inline=False
         )
 
@@ -261,8 +277,11 @@ async def my_session(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 @bot.tree.command(name="stopsession", description="Stop a session (Session Manager only)")
-@app_commands.describe(session_id="The session ID to stop")
-async def stop_session(interaction: discord.Interaction, session_id: str):
+@app_commands.describe(
+    session_id="The session ID to stop",
+    image="Optional: JPG image to display in the shutdown embed"
+)
+async def stop_session(interaction: discord.Interaction, session_id: str, image: discord.Attachment = None):
     """End a session - Session Manager only"""
     
     # Check permissions
@@ -274,6 +293,17 @@ async def stop_session(interaction: discord.Interaction, session_id: str):
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
         return
+    
+    # Validate image if provided
+    if image:
+        if not image.content_type or not image.content_type.startswith("image/"):
+            embed = discord.Embed(
+                title="❌ Invalid Image",
+                description="Please attach a valid image file (JPG, PNG, etc.)",
+                color=discord.Color.red()
+            )
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
     
     session = session_manager.get_session(session_id)
 
@@ -297,6 +327,10 @@ async def stop_session(interaction: discord.Interaction, session_id: str):
     embed.add_field(name="Game Type", value=session["game_type"].capitalize(), inline=True)
     embed.add_field(name="Total Players", value=session["current_players"], inline=True)
     embed.add_field(name="Status", value="⚫ Ended", inline=True)
+    
+    # Add image to embed if provided
+    if image:
+        embed.set_image(url=image.url)
 
     await interaction.response.send_message(embed=embed)
     
@@ -315,7 +349,7 @@ async def show_help(interaction: discord.Interaction):
 
     embed.add_field(
         name="Session Manager Commands",
-        value="`/startsession` - Start a new session\n`/stopsession` - Stop a session",
+        value="`/startsession` - Start a new session (optional: add JPG image)\n`/stopsession` - Stop a session (optional: add JPG image)",
         inline=False
     )
 
