@@ -16,16 +16,22 @@ intents.members = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 session_manager = SessionManager()
 
-# Configuration
+# Configuration - Dynamic settings
 SESSION_CHANNEL_ID = 1555296270057218148
 SESSION_MANAGER_ROLE_ID = 1555296192424841217
+
+# Store settings in memory (you could also use a database)
+settings = {
+    "session_channel_id": SESSION_CHANNEL_ID,
+    "session_manager_role_id": SESSION_MANAGER_ROLE_ID
+}
 
 def has_session_manager_role(interaction: discord.Interaction) -> bool:
     """Check if user has the Session Manager role"""
     if interaction.user.guild_permissions.administrator:
         return True
     
-    role = interaction.guild.get_role(SESSION_MANAGER_ROLE_ID)
+    role = interaction.guild.get_role(settings["session_manager_role_id"])
     if role and role in interaction.user.roles:
         return True
     
@@ -34,7 +40,7 @@ def has_session_manager_role(interaction: discord.Interaction) -> bool:
 async def post_to_session_channel(bot: commands.Bot, embed: discord.Embed):
     """Post an embed to the session channel"""
     try:
-        channel = bot.get_channel(SESSION_CHANNEL_ID)
+        channel = bot.get_channel(settings["session_channel_id"])
         if channel:
             await channel.send(embed=embed)
     except Exception as e:
@@ -43,10 +49,68 @@ async def post_to_session_channel(bot: commands.Bot, embed: discord.Embed):
 @bot.event
 async def on_ready():
     print(f"{bot.user} connected to Discord!")
-    print(f"Session Channel ID: {SESSION_CHANNEL_ID}")
-    print(f"Session Manager Role ID: {SESSION_MANAGER_ROLE_ID}")
+    print(f"Session Channel ID: {settings['session_channel_id']}")
+    print(f"Session Manager Role ID: {settings['session_manager_role_id']}")
     print("Slash commands ready")
     print("------")
+
+# ADMIN CONFIGURATION COMMANDS
+
+@bot.tree.command(name="setsessionchannel", description="Set the channel where sessions are posted (Admin only)")
+@app_commands.describe(channel="The channel to post sessions to")
+async def set_session_channel(interaction: discord.Interaction, channel: discord.TextChannel):
+    """Set the session channel - Admin only"""
+    
+    # Check permissions
+    if not interaction.user.guild_permissions.administrator:
+        embed = discord.Embed(
+            title="❌ Permission Denied",
+            description="Only server administrators can change the session channel.",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+    
+    # Update the setting
+    settings["session_channel_id"] = channel.id
+    
+    embed = discord.Embed(
+        title="✅ Session Channel Updated",
+        description=f"Session notifications will now be posted to {channel.mention}",
+        color=discord.Color.green()
+    )
+    embed.add_field(name="Channel ID", value=f"`{channel.id}`", inline=False)
+    embed.add_field(name="Channel Name", value=f"`{channel.name}`", inline=False)
+    
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="setsessionrole", description="Set the role required to manage sessions (Admin only)")
+@app_commands.describe(role="The role that can manage sessions")
+async def set_session_role(interaction: discord.Interaction, role: discord.Role):
+    """Set the session manager role - Admin only"""
+    
+    # Check permissions
+    if not interaction.user.guild_permissions.administrator:
+        embed = discord.Embed(
+            title="❌ Permission Denied",
+            description="Only server administrators can change the session manager role.",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+    
+    # Update the setting
+    settings["session_manager_role_id"] = role.id
+    
+    embed = discord.Embed(
+        title="✅ Session Manager Role Updated",
+        description=f"Only users with {role.mention} can now manage sessions.",
+        color=discord.Color.green()
+    )
+    embed.add_field(name="Role ID", value=f"`{role.id}`", inline=False)
+    embed.add_field(name="Role Name", value=f"`{role.name}`", inline=False)
+    
+    await interaction.response.send_message(embed=embed)
 
 # SLASH COMMANDS
 
@@ -63,7 +127,7 @@ async def start_session(interaction: discord.Interaction, game_type: str, player
     if not has_session_manager_role(interaction):
         embed = discord.Embed(
             title="❌ Permission Denied",
-            description=f"Only users with the <@&{SESSION_MANAGER_ROLE_ID}> role can start sessions.",
+            description=f"Only users with the <@&{settings['session_manager_role_id']}> role can start sessions.",
             color=discord.Color.red()
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -288,7 +352,7 @@ async def stop_session(interaction: discord.Interaction, session_id: str, image:
     if not has_session_manager_role(interaction):
         embed = discord.Embed(
             title="❌ Permission Denied",
-            description=f"Only users with the <@&{SESSION_MANAGER_ROLE_ID}> role can stop sessions.",
+            description=f"Only users with the <@&{settings['session_manager_role_id']}> role can stop sessions.",
             color=discord.Color.red()
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -366,6 +430,12 @@ async def show_help(interaction: discord.Interaction):
     )
 
     embed.add_field(
+        name="Admin Commands",
+        value="`/setsessionchannel` - Set where sessions are posted\n`/setsessionrole` - Set the session manager role",
+        inline=False
+    )
+
+    embed.add_field(
         name="Game Types",
         value="`prison` • `police` • `firefighter` • `medic` • `casual`",
         inline=False
@@ -373,7 +443,7 @@ async def show_help(interaction: discord.Interaction):
     
     embed.add_field(
         name="Session Channel",
-        value=f"<#{SESSION_CHANNEL_ID}>",
+        value=f"<#{settings['session_channel_id']}>",
         inline=False
     )
 
