@@ -23,7 +23,9 @@ SESSION_MANAGER_ROLE_ID = 1555296192424841217
 # Store settings in memory (you could also use a database)
 settings = {
     "session_channel_id": SESSION_CHANNEL_ID,
-    "session_manager_role_id": SESSION_MANAGER_ROLE_ID
+    "session_manager_role_id": SESSION_MANAGER_ROLE_ID,
+    "session_start_banner_url": None,
+    "session_down_banner_url": None
 }
 
 def has_session_manager_role(interaction: discord.Interaction) -> bool:
@@ -112,6 +114,82 @@ async def set_session_role(interaction: discord.Interaction, role: discord.Role)
     
     await interaction.response.send_message(embed=embed)
 
+@bot.tree.command(name="sessionstartbannerjpg", description="Set the banner image for session startup (Admin only)")
+@app_commands.describe(image="The JPG image to display when sessions start")
+async def set_session_start_banner(interaction: discord.Interaction, image: discord.Attachment):
+    """Set the session start banner - Admin only"""
+    
+    # Check permissions
+    if not interaction.user.guild_permissions.administrator:
+        embed = discord.Embed(
+            title="❌ Permission Denied",
+            description="Only server administrators can change the session start banner.",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+    
+    # Validate image
+    if not image.content_type or not image.content_type.startswith("image/"):
+        embed = discord.Embed(
+            title="❌ Invalid Image",
+            description="Please attach a valid image file (JPG, PNG, etc.)",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+    
+    # Update the setting
+    settings["session_start_banner_url"] = image.url
+    
+    embed = discord.Embed(
+        title="✅ Session Start Banner Updated",
+        description="The banner will now display when sessions start.",
+        color=discord.Color.green()
+    )
+    embed.set_image(url=image.url)
+    embed.add_field(name="Image URL", value=f"[Click here]({image.url})", inline=False)
+    
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="sessiondownbannerjpg", description="Set the banner image for session shutdown (Admin only)")
+@app_commands.describe(image="The JPG image to display when sessions end")
+async def set_session_down_banner(interaction: discord.Interaction, image: discord.Attachment):
+    """Set the session shutdown banner - Admin only"""
+    
+    # Check permissions
+    if not interaction.user.guild_permissions.administrator:
+        embed = discord.Embed(
+            title="❌ Permission Denied",
+            description="Only server administrators can change the session shutdown banner.",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+    
+    # Validate image
+    if not image.content_type or not image.content_type.startswith("image/"):
+        embed = discord.Embed(
+            title="❌ Invalid Image",
+            description="Please attach a valid image file (JPG, PNG, etc.)",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+    
+    # Update the setting
+    settings["session_down_banner_url"] = image.url
+    
+    embed = discord.Embed(
+        title="✅ Session Shutdown Banner Updated",
+        description="The banner will now display when sessions end.",
+        color=discord.Color.green()
+    )
+    embed.set_image(url=image.url)
+    embed.add_field(name="Image URL", value=f"[Click here]({image.url})", inline=False)
+    
+    await interaction.response.send_message(embed=embed)
+
 # SLASH COMMANDS
 
 @bot.tree.command(name="startsession", description="Start a new ER:LC session")
@@ -163,9 +241,10 @@ async def start_session(interaction: discord.Interaction, game_type: str, player
         embed.add_field(name="Status", value="🟢 Active", inline=True)
         embed.set_footer(text="Use /joinsession to join!")
         
-        # Add image to embed if provided
-        if image:
-            embed.set_image(url=image.url)
+        # Add image to embed - prefer provided image, fallback to banner setting
+        image_url = image.url if image else settings["session_start_banner_url"]
+        if image_url:
+            embed.set_image(url=image_url)
         
         # Send to user
         await interaction.response.send_message(embed=embed)
@@ -392,9 +471,10 @@ async def stop_session(interaction: discord.Interaction, session_id: str, image:
     embed.add_field(name="Total Players", value=session["current_players"], inline=True)
     embed.add_field(name="Status", value="⚫ Ended", inline=True)
     
-    # Add image to embed if provided
-    if image:
-        embed.set_image(url=image.url)
+    # Add image to embed - prefer provided image, fallback to banner setting
+    image_url = image.url if image else settings["session_down_banner_url"]
+    if image_url:
+        embed.set_image(url=image_url)
 
     await interaction.response.send_message(embed=embed)
     
@@ -431,7 +511,7 @@ async def show_help(interaction: discord.Interaction):
 
     embed.add_field(
         name="Admin Commands",
-        value="`/setsessionchannel` - Set where sessions are posted\n`/setsessionrole` - Set the session manager role",
+        value="`/setsessionchannel` - Set where sessions are posted\n`/setsessionrole` - Set the session manager role\n`/sessionstartbannerjpg` - Set startup banner\n`/sessiondownbannerjpg` - Set shutdown banner",
         inline=False
     )
 
